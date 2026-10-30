@@ -43,7 +43,8 @@ src/rules/Copy.ts           中文文案 + 楷体栈
 src/rules/RunState.ts       单局数据，场景间传递
 src/rules/WxBridge.ts       分享/激励广告：有 wx 调真，否则 mock
 src/audio/Sfx.ts            Oscillator 短音效
-src/combat/Juice.ts         hitstop / shake / slash / killPop
+src/combat/Frames.ts        60Hz 帧表 + 动作状态机
+src/combat/Juice.ts         同帧多层反馈 / 残影 / 扬尘
 src/scenes/BootScene.ts     启动
 src/scenes/CoverScene.ts    封面
 src/scenes/CombatScene.ts   小怪 + Boss 战斗
@@ -51,6 +52,22 @@ src/scenes/DialogScene.ts   莲娘三选 + 驱邪 QTE
 src/scenes/ResultScene.ts   胜负 / 再来 / 分享 / 广告续命
 tools/verify_sheep_v1.mjs   Node 单测
 ```
+
+## Feel（王者手感子集 · 公开原则，非逆向）
+
+逻辑 **60Hz** 固定步；表现层插值坐标 + tween。命中只在 **active 逻辑帧**结算。顿帧冻逻辑不冻表现。
+
+| 动作 | startup | active | recovery | 取消 |
+|---|---|---|---|---|
+| 轻击 light | 5 | 3 | 9 | recovery≥2 → 闪避/轻击/钉耙 |
+| 钉耙 rake | 12 | 5 | 18 | recovery≥9 才可取消 |
+| 闪避 dodge | 2 | 8 | 4 | startup+active 无敌；可取消轻击后摇 |
+
+同帧多层（命中瞬间）：逻辑 hitstop 3/5/6 帧 + 击退 + 表现层 SFX/震屏/闪白/斩击。  
+敌人完美窗 = 前摇末 **5** 逻辑帧（贴判定落地）。  
+表现：anticipate→strike→settle、闪避残影、扬尘、钉耙闪屏。
+
+**诚实差距**：无英雄池/皮肤/帧同步联网/正式 Spine；这是单机竖屏原型的「打击感骨架」，不是《王者荣耀》还原。
 
 ## 手感深化（v1.1）
 
