@@ -4,6 +4,7 @@ import { shareFailText } from '../rules/SheepV1';
 import { freshRun, saveBestScore, type RunState } from '../rules/RunState';
 import { playRewardedAd, shareText } from '../rules/WxBridge';
 import { playSfx, unlockAudio } from '../audio/Sfx';
+import { addPanelButton } from '../ui/PanelButton';
 import { CombatScene } from './CombatScene';
 
 interface ResultData {
@@ -24,7 +25,7 @@ export class ResultScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
-    this.cameras.main.setBackgroundColor('#1a1220');
+    this.cameras.main.setBackgroundColor('#120c18');
     unlockAudio();
     const won = this.run.phase === 'won';
     playSfx(won ? 'win' : 'lose');
@@ -32,32 +33,41 @@ export class ResultScene extends Phaser.Scene {
     saveBestScore(this.run.score);
     this.run.bestScore = Math.max(this.run.bestScore, this.run.score);
 
-    const title = won
-      ? Copy.winTitle
-      : Copy.loseTitle;
+    this.add.rectangle(width / 2, height / 2, width - 28, height - 40, 0x1e1428).setStrokeStyle(3, 0x6b4a7a);
+
+    const title = won ? Copy.winTitle : Copy.loseTitle;
     const subtitle = won
       ? this.run.ending === 'guard'
         ? Copy.winTitleGuard
         : Copy.winTitleGreed
       : this.run.nearMiss || '';
 
-    this.add
-      .text(width / 2, height * 0.22, title, {
+    const titleText = this.add
+      .text(width / 2, height * 0.2, title, {
         fontFamily: FONT,
         fontSize: '48px',
         color: won ? '#ffe6a8' : '#ff9080',
+        stroke: '#1a1020',
+        strokeThickness: 6,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setScale(0.7)
+      .setAlpha(0);
+    this.tweens.add({ targets: titleText, alpha: 1, scale: 1, duration: 380, ease: 'Back.easeOut' });
 
-    this.add
-      .text(width / 2, height * 0.30, subtitle, {
+    const sub = this.add
+      .text(width / 2, height * 0.3, subtitle, {
         fontFamily: FONT,
-        fontSize: won ? '24px' : '30px',
+        fontSize: won ? '24px' : '32px',
         color: won ? '#d0c0e0' : '#ffd080',
         align: 'center',
         wordWrap: { width: width - 80 },
+        stroke: won ? undefined : '#3a2010',
+        strokeThickness: won ? 0 : 4,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setAlpha(0);
+    this.tweens.add({ targets: sub, alpha: 1, delay: 120, duration: 280 });
 
     if (this.run.comboPeak > 0) {
       this.add
@@ -70,13 +80,16 @@ export class ResultScene extends Phaser.Scene {
     }
 
     this.add
+      .rectangle(width / 2, height * 0.44, 420, 56, 0x2a1c38, 0.95)
+      .setStrokeStyle(2, 0x8a6098);
+    this.add
       .text(
         width / 2,
         height * 0.44,
         `${Copy.score} ${this.run.score}　${Copy.best} ${this.run.bestScore}`,
         {
           fontFamily: FONT,
-          fontSize: '28px',
+          fontSize: '26px',
           color: '#fff0d0',
         },
       )
@@ -87,13 +100,13 @@ export class ResultScene extends Phaser.Scene {
         label: won ? Copy.winAgain : Copy.loseRetry,
         y: height * 0.55,
         color: 0xc45c26,
-        fn: () => { playSfx('ui'); this.retry(); },
+        fn: () => this.retry(),
       },
       {
         label: won ? Copy.winShare : Copy.loseShare,
         y: height * 0.65,
         color: 0x3a6a98,
-        fn: () => { playSfx('ui'); this.share(); },
+        fn: () => this.share(),
       },
     ];
 
@@ -108,18 +121,16 @@ export class ResultScene extends Phaser.Scene {
     }
 
     for (const b of buttons) {
-      const r = this.add
-        .rectangle(width / 2, b.y, 360, 70, b.color)
-        .setStrokeStyle(2, 0xffd080)
-        .setInteractive({ useHandCursor: true });
-      this.add
-        .text(width / 2, b.y, b.label, {
-          fontFamily: FONT,
-          fontSize: '28px',
-          color: '#fff8e8',
-        })
-        .setOrigin(0.5);
-      r.on('pointerdown', b.fn);
+      addPanelButton(this, {
+        x: width / 2,
+        y: b.y,
+        w: 360,
+        h: 68,
+        fill: b.color,
+        label: b.label,
+        fontSize: '28px',
+        onPress: b.fn,
+      });
     }
   }
 
@@ -164,6 +175,8 @@ export class ResultScene extends Phaser.Scene {
         fontFamily: FONT,
         fontSize: '20px',
         color: '#ffe080',
+        stroke: '#1a1020',
+        strokeThickness: 3,
       })
       .setOrigin(0.5);
     this.tweens.add({

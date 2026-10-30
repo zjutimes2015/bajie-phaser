@@ -1,8 +1,16 @@
 import Phaser from 'phaser';
 import type { AttackTier } from './Frames';
 import { playSfx } from '../audio/Sfx';
+import { FONT } from '../rules/Copy';
 
 /** 同帧多层反馈 + 表现层 tween（逻辑层不管这些）。 */
+
+/** trauma 分层震屏：轻/重/完美 */
+const SHAKE: Record<AttackTier, { intensity: number; ms: number }> = {
+  light: { intensity: 0.007, ms: 85 },
+  rake: { intensity: 0.02, ms: 210 },
+  perfect: { intensity: 0.014, ms: 150 },
+};
 
 export function shake(scene: Phaser.Scene, intensity = 0.006, duration = 120): void {
   scene.cameras.main.shake(duration, intensity);
@@ -16,6 +24,23 @@ export function screenFlash(scene: Phaser.Scene, color = 0xfff0c0, alpha = 0.35,
     alpha: 0,
     duration: ms,
     onComplete: () => f.destroy(),
+  });
+}
+
+/** 按钮/拾取 pop：短促放大回弹 */
+export function popScale(
+  scene: Phaser.Scene,
+  target: Phaser.GameObjects.GameObject & { setScale: (x: number, y?: number) => unknown },
+  peak = 1.25,
+): void {
+  scene.tweens.killTweensOf(target);
+  scene.tweens.add({
+    targets: target,
+    scaleX: peak,
+    scaleY: peak,
+    duration: 70,
+    yoyo: true,
+    ease: 'Back.easeOut',
   });
 }
 
@@ -55,16 +80,20 @@ export function killPop(scene: Phaser.Scene, x: number, y: number, scoreGain: nu
   }
   const t = scene.add
     .text(x, y - 20, `+${scoreGain}`, {
-      fontFamily: 'KaiTi, STKaiti, 楷体, serif',
-      fontSize: '22px',
+      fontFamily: FONT,
+      fontSize: '24px',
       color: '#ffe65a',
+      stroke: '#1a1020',
+      strokeThickness: 5,
     })
-    .setOrigin(0.5);
+    .setOrigin(0.5)
+    .setScale(0.7);
   scene.tweens.add({
     targets: t,
     y: y - 70,
     alpha: 0,
-    duration: 500,
+    scale: 1.15,
+    duration: 520,
     onComplete: () => t.destroy(),
   });
 }
@@ -77,28 +106,32 @@ export function floatDmg(
   style: 'normal' | 'crit' | 'miss' | 'hurt',
 ): void {
   const map = {
-    normal: { color: '#ffe65a', size: '22px' },
-    crit: { color: '#ffd700', size: '32px' },
-    miss: { color: '#8890a0', size: '18px' },
-    hurt: { color: '#ff5a5a', size: '22px' },
+    normal: { color: '#ffe65a', size: '22px', peak: 1.05 },
+    crit: { color: '#ffd700', size: '34px', peak: 1.45 },
+    miss: { color: '#8890a0', size: '18px', peak: 1 },
+    hurt: { color: '#ff5a5a', size: '24px', peak: 1.1 },
   } as const;
   const s = map[style];
   const label = style === 'miss' ? '扑空' : `-${Math.floor(dmg)}`;
   const t = scene.add
     .text(x, y, label, {
-      fontFamily: 'KaiTi, STKaiti, 楷体, serif',
+      fontFamily: FONT,
       fontSize: s.size,
       color: s.color,
       fontStyle: style === 'crit' ? 'bold' : undefined,
+      stroke: '#1a1020',
+      strokeThickness: style === 'crit' ? 6 : 4,
+      shadow: { offsetX: 2, offsetY: 2, color: '#000000', blur: 0, fill: true },
     })
-    .setOrigin(0.5);
-  if (style === 'crit') t.setScale(1.2);
+    .setOrigin(0.5)
+    .setScale(style === 'crit' ? 0.55 : 0.85);
   scene.tweens.add({
     targets: t,
-    y: y - (style === 'crit' ? 80 : 60),
+    y: y - (style === 'crit' ? 90 : 60),
     alpha: 0,
-    scale: style === 'crit' ? 1.4 : 1,
-    duration: style === 'crit' ? 850 : 700,
+    scale: s.peak,
+    duration: style === 'crit' ? 900 : 700,
+    ease: style === 'crit' ? 'Back.easeOut' : 'Cubic.easeOut',
     onComplete: () => t.destroy(),
   });
 }
@@ -144,19 +177,20 @@ export function hitConnectFx(
   y: number,
   facing: number,
 ): void {
+  const sk = SHAKE[tier];
   if (tier === 'light') {
     playSfx('hit');
-    shake(scene, 0.005, 70);
+    shake(scene, sk.intensity, sk.ms);
     slashSwipe(scene, x, y, facing, 0xffe080, false);
   } else if (tier === 'rake') {
     playSfx('rake');
-    shake(scene, 0.014, 180);
-    screenFlash(scene, 0xffe0a0, 0.4, 100);
+    shake(scene, sk.intensity, sk.ms);
+    screenFlash(scene, 0xffe0a0, 0.45, 110);
     slashSwipe(scene, x, y, facing, 0xff9040, true);
   } else {
     playSfx('perfect');
-    shake(scene, 0.01, 120);
-    screenFlash(scene, 0xa0ffe0, 0.3, 90);
+    shake(scene, sk.intensity, sk.ms);
+    screenFlash(scene, 0xa0ffe0, 0.35, 100);
     slashSwipe(scene, x, y, facing, 0x80ffc0, false);
   }
 }
@@ -178,7 +212,6 @@ export function playAttackMotion(
 ): void {
   const back = facing * (tier === 'rake' ? -16 : -8);
   const fwd = facing * (tier === 'rake' ? 28 : 14);
-  const y0 = body.y;
   scene.tweens.killTweensOf(body);
   scene.tweens.add({
     targets: body,
@@ -205,5 +238,4 @@ export function playAttackMotion(
       });
     },
   });
-  void y0;
 }

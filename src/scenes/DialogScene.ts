@@ -3,6 +3,7 @@ import { Copy, FONT } from '../rules/Copy';
 import { buffsFromChoice, type ChoiceId, type RunState } from '../rules/RunState';
 import { CRAVING_LOCK_SEC, addCraving, dialogCravingDelta } from '../rules/SheepV1';
 import { playSfx, unlockAudio } from '../audio/Sfx';
+import { addPanelButton } from '../ui/PanelButton';
 
 interface DialogData {
   run: RunState;
@@ -33,17 +34,22 @@ export class DialogScene extends Phaser.Scene {
   create() {
     unlockAudio();
     const { width, height } = this.scale;
-    this.cameras.main.setBackgroundColor('#1a1220');
+    this.cameras.main.setBackgroundColor('#120c18');
 
     this.add.rectangle(width / 2, height / 2, width - 40, height - 80, 0x2a1c38).setStrokeStyle(3, 0x8a6098);
 
-    this.add
+    const title = this.add
       .text(width / 2, 120, Copy.dialogTitle, {
         fontFamily: FONT,
         fontSize: '40px',
         color: '#ffd0e8',
+        stroke: '#2a1030',
+        strokeThickness: 5,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setScale(0.8)
+      .setAlpha(0);
+    this.tweens.add({ targets: title, alpha: 1, scale: 1, duration: 320, ease: 'Back.easeOut' });
 
     this.add
       .text(width / 2, 220, Copy.dialogBody, {
@@ -67,26 +73,27 @@ export class DialogScene extends Phaser.Scene {
     ];
     items.forEach((it, i) => {
       const y = 420 + i * 110;
-      const r = this.add
-        .rectangle(width / 2, y, 520, 88, 0x3e2a52)
-        .setStrokeStyle(2, 0xc8a0d8)
-        .setInteractive({ useHandCursor: true });
-      const t = this.add
-        .text(width / 2, y - 12, it.label, {
-          fontFamily: FONT,
-          fontSize: '28px',
-          color: '#fff8f0',
-        })
-        .setOrigin(0.5);
+      const btn = addPanelButton(this, {
+        x: width / 2,
+        y,
+        w: 520,
+        h: 88,
+        fill: 0x3e2a52,
+        stroke: 0xc8a0d8,
+        label: it.label,
+        fontSize: '28px',
+        onPress: () => this.pick(it.id),
+      });
+      btn.label.setY(y - 14);
       const tip = this.add
         .text(width / 2, y + 22, it.tip, {
           fontFamily: FONT,
           fontSize: '16px',
           color: '#b0a0c0',
         })
-        .setOrigin(0.5);
-      r.on('pointerdown', () => { playSfx('ui'); this.pick(it.id); });
-      this.choiceRoot.push(r, t, tip);
+        .setOrigin(0.5)
+        .setDepth(12);
+      this.choiceRoot.push(btn.panel, btn.label, tip);
     });
   }
 
@@ -114,6 +121,8 @@ export class DialogScene extends Phaser.Scene {
         fontFamily: FONT,
         fontSize: '36px',
         color: '#ffe080',
+        stroke: '#1a1020',
+        strokeThickness: 4,
       })
       .setOrigin(0.5);
 
@@ -131,19 +140,18 @@ export class DialogScene extends Phaser.Scene {
     const timerFill = this.add.rectangle(width / 2 - 200, height * 0.62, 400, 10, 0xffd070).setOrigin(0, 0.5);
     this.tweens.add({ targets: timerFill, width: 0, duration: QTE_SEC * 1000, ease: 'Linear' });
 
-    const tap = this.add
-      .rectangle(width / 2, height * 0.72, 280, 90, 0xc45c26)
-      .setStrokeStyle(3, 0xffd080)
-      .setInteractive({ useHandCursor: true });
-    this.add
-      .text(width / 2, height * 0.72, '连点！', {
-        fontFamily: FONT,
-        fontSize: '32px',
-        color: '#fff8e8',
-      })
-      .setOrigin(0.5);
+    addPanelButton(this, {
+      x: width / 2,
+      y: height * 0.72,
+      w: 280,
+      h: 90,
+      fill: 0xc45c26,
+      label: '连点！',
+      fontSize: '32px',
+      sfx: 'none',
+      onPress: () => this.qteTap(),
+    });
 
-    tap.on('pointerdown', () => this.qteTap());
     if (this.input.keyboard) {
       this.input.keyboard.on('keydown-Z', () => this.qteTap());
       this.input.keyboard.on('keydown-SPACE', () => this.qteTap());
@@ -163,7 +171,15 @@ export class DialogScene extends Phaser.Scene {
     if (this.qteHits >= QTE_NEED) {
       this.qteOpen = false;
       playSfx('perfect');
-      this.add.text(this.scale.width/2, this.scale.height*0.35, Copy.qteOk, { fontFamily: FONT, fontSize: '36px', color: '#80ffc0' }).setOrigin(0.5);
+      this.add
+        .text(this.scale.width / 2, this.scale.height * 0.35, Copy.qteOk, {
+          fontFamily: FONT,
+          fontSize: '36px',
+          color: '#80ffc0',
+          stroke: '#102018',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5);
       this.time.delayedCall(450, () => this.finish('exorcise', true));
       return;
     }
@@ -173,7 +189,15 @@ export class DialogScene extends Phaser.Scene {
     if (!this.qteOpen) return;
     this.qteOpen = false;
     playSfx('hurt');
-    this.add.text(this.scale.width/2, this.scale.height*0.35, Copy.qteFail, { fontFamily: FONT, fontSize: '28px', color: '#ff8080' }).setOrigin(0.5);
+    this.add
+      .text(this.scale.width / 2, this.scale.height * 0.35, Copy.qteFail, {
+        fontFamily: FONT,
+        fontSize: '28px',
+        color: '#ff8080',
+        stroke: '#201010',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5);
     this.cameras.main.shake(150, 0.01);
     this.time.delayedCall(500, () => this.finish('exorcise', false));
   }
@@ -187,10 +211,7 @@ export class DialogScene extends Phaser.Scene {
     this.run.bossBreak = buffs.bossBreak;
     this.run.playerHp = Math.max(
       1,
-      Math.min(
-        this.run.playerMaxHp,
-        this.run.playerHp + this.run.playerMaxHp * buffs.healRatio,
-      ),
+      Math.min(this.run.playerMaxHp, this.run.playerHp + this.run.playerMaxHp * buffs.healRatio),
     );
     const cravingDelta = dialogCravingDelta(buffs.choice, buffs.bossBreak);
     if (cravingDelta !== 0) {

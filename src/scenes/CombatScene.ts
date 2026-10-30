@@ -21,9 +21,11 @@ import {
   hitConnectFx,
   killPop,
   playAttackMotion,
+  popScale,
   shake,
   victimFlash,
 } from '../combat/Juice';
+import { addPanelButton, type PanelButton } from '../ui/PanelButton';
 import {
   CHARGE_FRAMES,
   HITSTOP_FRAMES,
@@ -135,6 +137,14 @@ export class CombatScene extends Phaser.Scene {
   private bossBarLabel!: Phaser.GameObjects.Text;
   private vignette!: Phaser.GameObjects.Rectangle;
   private perfectHint!: Phaser.GameObjects.Text;
+  private hudPanel!: Phaser.GameObjects.Rectangle;
+  private hpBarFrame!: Phaser.GameObjects.Rectangle;
+  private cravingLockGlow = false;
+  private touchAtk!: PanelButton;
+  private touchDodge!: PanelButton;
+  private touchRake!: PanelButton;
+  private perfectWarnArmed = true;
+  private hpPulseT = 0;
 
   constructor() {
     super('Combat');
@@ -163,6 +173,9 @@ export class CombatScene extends Phaser.Scene {
     this.bufferedLight = false;
     this.bufferedRake = false;
     this.cravingSlotsGfx = [];
+    this.perfectWarnArmed = true;
+    this.cravingLockGlow = false;
+    this.hpPulseT = 0;
   }
 
   create() {
@@ -189,7 +202,13 @@ export class CombatScene extends Phaser.Scene {
       .setAlpha(0);
 
     this.comboText = this.add
-      .text(width - 28, 120, '', { fontFamily: FONT, fontSize: '28px', color: '#ffe080' })
+      .text(width - 28, 128, '', {
+        fontFamily: FONT,
+        fontSize: '36px',
+        color: '#ffe080',
+        stroke: '#1a1020',
+        strokeThickness: 6,
+      })
       .setOrigin(1, 0)
       .setDepth(15)
       .setAlpha(0);
@@ -197,8 +216,10 @@ export class CombatScene extends Phaser.Scene {
     this.perfectHint = this.add
       .text(width / 2, height / 2 - 200, '', {
         fontFamily: FONT,
-        fontSize: '26px',
+        fontSize: '28px',
         color: '#80ffc0',
+        stroke: '#102018',
+        strokeThickness: 5,
       })
       .setOrigin(0.5)
       .setDepth(18)
@@ -235,49 +256,77 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private buildHud() {
-    const pad = 24;
-    this.add.text(pad, 18, Copy.hp, { fontFamily: FONT, fontSize: '16px', color: '#ffe8c0' });
-    this.hpBarBg = this.add.rectangle(pad + 50, 26, 200, 16, 0x3a2848).setOrigin(0, 0.5);
-    this.hpBarFill = this.add.rectangle(pad + 50, 26, 200, 16, 0x70d070).setOrigin(0, 0.5);
+    const pad = 20;
+    // 半透明信息面板
+    this.hudPanel = this.add
+      .rectangle(pad + 160, 58, 320, 100, 0x160e20, 0.72)
+      .setStrokeStyle(2, 0x6b4a7a, 0.85)
+      .setDepth(12);
 
-    this.add.text(pad, 48, Copy.craving, { fontFamily: FONT, fontSize: '16px', color: '#ffe8c0' });
+    this.add
+      .text(pad + 12, 16, Copy.hp, { fontFamily: FONT, fontSize: '15px', color: '#ffe8c0' })
+      .setDepth(13);
+    this.hpBarFrame = this.add
+      .rectangle(pad + 52, 24, 208, 20, 0x1a1020)
+      .setOrigin(0, 0.5)
+      .setStrokeStyle(2, 0x9a80b0)
+      .setDepth(13);
+    this.hpBarBg = this.add.rectangle(pad + 56, 24, 200, 14, 0x3a2848).setOrigin(0, 0.5).setDepth(13);
+    this.hpBarFill = this.add.rectangle(pad + 56, 24, 200, 14, 0x70d070).setOrigin(0, 0.5).setDepth(14);
+
+    this.add
+      .text(pad + 12, 46, Copy.craving, { fontFamily: FONT, fontSize: '15px', color: '#ffe8c0' })
+      .setDepth(13);
     for (let i = 0; i < 7; i++) {
-      const s = this.add.rectangle(pad + 50 + i * 26, 56, 22, 14, 0x3a2848).setOrigin(0, 0.5);
+      const s = this.add
+        .rectangle(pad + 56 + i * 28, 54, 24, 16, 0x3a2848)
+        .setOrigin(0, 0.5)
+        .setStrokeStyle(1, 0x5a4068)
+        .setDepth(13);
       this.cravingSlotsGfx.push(s);
     }
 
-    this.rakePie = this.add.graphics().setPosition(this.scale.width - 70, 50);
+    this.rakePie = this.add.graphics().setPosition(this.scale.width - 70, 50).setDepth(13);
     this.rakeLabel = this.add
       .text(this.scale.width - 70, 50, '耙', {
         fontFamily: FONT,
         fontSize: '16px',
         color: '#fff0d8',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(14);
 
-    this.scoreText = this.add.text(pad, 78, '', {
-      fontFamily: FONT,
-      fontSize: '16px',
-      color: '#ffe8c0',
-    });
+    this.scoreText = this.add
+      .text(pad + 12, 78, '', {
+        fontFamily: FONT,
+        fontSize: '15px',
+        color: '#ffe8c0',
+      })
+      .setDepth(13);
 
     const bw = 560;
     this.bossBarBg = this.add
-      .rectangle(this.cx(), 140, bw, 18, 0x3a2030)
+      .rectangle(this.cx(), 140, bw, 22, 0x3a2030)
       .setOrigin(0.5)
-      .setVisible(false);
+      .setStrokeStyle(2, 0xff80a0, 0.5)
+      .setVisible(false)
+      .setDepth(12);
     this.bossBarFill = this.add
-      .rectangle(this.cx() - bw / 2, 140, bw, 18, 0xdc466e)
+      .rectangle(this.cx() - bw / 2 + 2, 140, bw - 4, 16, 0xdc466e)
       .setOrigin(0, 0.5)
-      .setVisible(false);
+      .setVisible(false)
+      .setDepth(13);
     this.bossBarLabel = this.add
-      .text(this.cx(), 118, Copy.bossName, {
+      .text(this.cx(), 116, Copy.bossName, {
         fontFamily: FONT,
         fontSize: '18px',
         color: '#ffb0c8',
+        stroke: '#201018',
+        strokeThickness: 3,
       })
       .setOrigin(0.5)
-      .setVisible(false);
+      .setVisible(false)
+      .setDepth(13);
   }
 
   private spawnPlayer() {
@@ -395,31 +444,88 @@ export class CombatScene extends Phaser.Scene {
 
   private buildControls() {
     const { width, height } = this.scale;
-    const y = height - 90;
-    const mk = (x: number, label: string, onDown: () => void, onUp?: () => void) => {
-      const r = this.add
-        .rectangle(x, y, 100, 64, 0x3a2848)
-        .setStrokeStyle(2, 0x9a80b0)
-        .setInteractive({ useHandCursor: true })
-        .setDepth(25);
-      this.add
-        .text(x, y, label, { fontFamily: FONT, fontSize: '22px', color: '#fff0d8' })
-        .setOrigin(0.5)
-        .setDepth(26);
-      r.on('pointerdown', () => {
-        playSfx('ui');
-        onDown();
-      });
-      if (onUp) {
-        r.on('pointerup', onUp);
-        r.on('pointerout', onUp);
-      }
-    };
-    mk(width * 0.12, Copy.moveLeft, () => { this.moveDir = -1; }, () => { if (this.moveDir < 0) this.moveDir = 0; });
-    mk(width * 0.28, Copy.moveRight, () => { this.moveDir = 1; }, () => { if (this.moveDir > 0) this.moveDir = 0; });
-    mk(width * 0.55, Copy.attack, () => this.pressAttack(), () => this.releaseAttack());
-    mk(width * 0.72, Copy.dodge, () => { this.bufferedDodge = true; });
-    mk(width * 0.9, '钉耙', () => { this.bufferedRake = true; });
+    const y = height - 88;
+    // 移动：左右
+    addPanelButton(this, {
+      x: width * 0.12,
+      y,
+      w: 96,
+      h: 68,
+      fill: 0x3a2848,
+      stroke: 0x9a80b0,
+      label: Copy.moveLeft,
+      fontSize: '26px',
+      depth: 25,
+      sfx: 'ui',
+      onPress: () => {
+        this.moveDir = -1;
+      },
+      onRelease: () => {
+        if (this.moveDir < 0) this.moveDir = 0;
+      },
+    });
+    addPanelButton(this, {
+      x: width * 0.28,
+      y,
+      w: 96,
+      h: 68,
+      fill: 0x3a2848,
+      stroke: 0x9a80b0,
+      label: Copy.moveRight,
+      fontSize: '26px',
+      depth: 25,
+      sfx: 'ui',
+      onPress: () => {
+        this.moveDir = 1;
+      },
+      onRelease: () => {
+        if (this.moveDir > 0) this.moveDir = 0;
+      },
+    });
+    this.touchAtk = addPanelButton(this, {
+      x: width * 0.55,
+      y,
+      w: 110,
+      h: 68,
+      fill: 0x5a3848,
+      stroke: 0xffd080,
+      label: Copy.attack,
+      fontSize: '22px',
+      depth: 25,
+      sfx: 'ui',
+      onPress: () => this.pressAttack(),
+      onRelease: () => this.releaseAttack(),
+    });
+    this.touchDodge = addPanelButton(this, {
+      x: width * 0.72,
+      y,
+      w: 110,
+      h: 68,
+      fill: 0x2a4860,
+      stroke: 0x80d0ff,
+      label: Copy.dodge,
+      fontSize: '22px',
+      depth: 25,
+      sfx: 'none',
+      onPress: () => {
+        this.bufferedDodge = true;
+      },
+    });
+    this.touchRake = addPanelButton(this, {
+      x: width * 0.9,
+      y,
+      w: 110,
+      h: 68,
+      fill: 0xc45c26,
+      stroke: 0xffd080,
+      label: '钉耙',
+      fontSize: '22px',
+      depth: 25,
+      sfx: 'none',
+      onPress: () => {
+        this.bufferedRake = true;
+      },
+    });
   }
 
   private bindKeys() {
@@ -605,6 +711,7 @@ export class CombatScene extends Phaser.Scene {
     this.facing = leap >= 0 ? 1 : -1;
     afterimage(this, this.player.x, this.player.y, this.player.w, this.player.h, COLORS.player);
     dustPuff(this, this.player.x, this.player.y);
+    playSfx('dodge');
     this.player.x = Phaser.Math.Clamp(
       this.player.x + leap,
       this.cx() - ARENA_HALF,
@@ -701,9 +808,17 @@ export class CombatScene extends Phaser.Scene {
     this.comboTimer = COMBO_WINDOW;
     if (this.combo > this.run.comboPeak) this.run.comboPeak = this.combo;
     if (this.combo >= 2) {
-      this.comboText.setText(`${Copy.combo} ×${this.combo}`).setAlpha(1);
+      this.comboText.setText(`${Copy.combo} ×${this.combo}`).setAlpha(1).setScale(0.7);
       this.tweens.killTweensOf(this.comboText);
-      this.tweens.add({ targets: this.comboText, alpha: 0.4, delay: 800, duration: 400 });
+      this.tweens.add({
+        targets: this.comboText,
+        scaleX: 1.2,
+        scaleY: 1.2,
+        duration: 90,
+        yoyo: true,
+        onComplete: () => this.comboText.setScale(1),
+      });
+      this.tweens.add({ targets: this.comboText, alpha: 0.45, delay: 900, duration: 400 });
     }
   }
 
@@ -844,11 +959,17 @@ export class CombatScene extends Phaser.Scene {
       }
       // 完美窗：贴着判定落地的末 PERFECT_EDGE_FRAMES 帧
       if (e.windup > 0 && e.windup <= PERFECT_EDGE_FRAMES) {
+        if (this.perfectWarnArmed) {
+          playSfx('warn');
+          this.perfectWarnArmed = false;
+          popScale(this, this.perfectHint, 1.15);
+        }
         this.perfectFrames = e.windup;
         this.perfectHint.setText('！可完美闪避').setAlpha(1);
       }
       if (e.windup <= 0) {
         this.perfectFrames = 0;
+        this.perfectWarnArmed = true;
         this.perfectHint.setAlpha(0).setText('');
         this.resolveEnemyAttack(e);
       }
@@ -1054,13 +1175,31 @@ export class CombatScene extends Phaser.Scene {
   private refreshHud() {
     const hpRatio = Math.max(0, this.player.hp / this.player.maxHp);
     this.hpBarFill.width = 200 * hpRatio;
-    this.hpBarFill.setFillStyle(hpRatio < 0.25 ? 0xff5050 : hpRatio < 0.5 ? 0xe0c040 : 0x70d070);
+    let hpColor = hpRatio < 0.25 ? 0xff5050 : hpRatio < 0.5 ? 0xe0c040 : 0x70d070;
+    if (hpRatio < 0.25 && !this.player.dead) {
+      this.hpPulseT += 0.12;
+      const pulse = 0.65 + Math.sin(this.hpPulseT) * 0.35;
+      const c = Phaser.Display.Color.IntegerToColor(hpColor);
+      c.lighten(Math.floor(40 * pulse));
+      hpColor = c.color;
+      this.hpBarFrame.setStrokeStyle(2, 0xff8080);
+    } else {
+      this.hpBarFrame.setStrokeStyle(2, 0x9a80b0);
+    }
+    this.hpBarFill.setFillStyle(hpColor);
 
     const slots = cravingSlots(this.run.craving);
+    const locked = this.run.cravingLockLeft > 0;
+    const full = slots >= 7;
+    if (locked !== this.cravingLockGlow) {
+      this.cravingLockGlow = locked;
+    }
     for (let i = 0; i < 7; i++) {
-      const locked = this.run.cravingLockLeft > 0;
-      this.cravingSlotsGfx[i].setFillStyle(
-        i < slots ? (locked ? 0xff6060 : 0xd080ff) : 0x3a2848,
+      const filled = i < slots;
+      this.cravingSlotsGfx[i].setFillStyle(filled ? (locked ? 0xff5050 : 0xd080ff) : 0x3a2848);
+      this.cravingSlotsGfx[i].setStrokeStyle(
+        filled && (locked || full) ? 2 : 1,
+        filled && locked ? 0xffd0d0 : filled && full ? 0xffe0ff : 0x5a4068,
       );
     }
 
@@ -1068,6 +1207,10 @@ export class CombatScene extends Phaser.Scene {
     const ready = this.run.rakeCd <= 0 && this.run.cravingLockLeft <= 0;
     this.rakePie.fillStyle(ready ? 0xc45c26 : 0x3a2848, 1);
     this.rakePie.fillCircle(0, 0, 28);
+    if (ready) {
+      this.rakePie.lineStyle(3, 0xffe080, 0.95);
+      this.rakePie.strokeCircle(0, 0, 28);
+    }
     if (this.run.rakeCd > 0) {
       const p = 1 - this.run.rakeCd / RAKE_MAX;
       this.rakePie.fillStyle(0xffd080, 0.9);
@@ -1080,16 +1223,21 @@ export class CombatScene extends Phaser.Scene {
       this.rakeLabel.setText('耙');
     }
 
+    const waveBit = this.mode === 'trash' ? `  波次 ${this.wave}/2` : '';
     this.scoreText.setText(
-      `${Copy.score} ${this.run.score}  ${Copy.best} ${this.run.bestScore}` +
-        (this.combo >= 2 ? `  ${Copy.combo}×${this.combo}` : ''),
+      `${Copy.score} ${this.run.score}  ${Copy.best} ${this.run.bestScore}${waveBit}`,
     );
+
+    if (this.touchRake) {
+      this.touchRake.setCoolRatio(this.run.rakeCd > 0 ? this.run.rakeCd / RAKE_MAX : locked ? 1 : 0);
+      this.touchDodge.setCoolRatio(0);
+    }
 
     if (this.mode === 'boss') {
       const boss = this.enemies.find((e) => e.kind === 'boss' && !e.dead);
       if (boss) {
         const r = Math.max(0, boss.hp / boss.maxHp);
-        this.bossBarFill.width = 560 * r;
+        this.bossBarFill.width = (560 - 4) * r;
         this.bossBarLabel.setText(`${Copy.bossName}  ${Math.ceil(boss.hp)}/${boss.maxHp}`);
       }
     }

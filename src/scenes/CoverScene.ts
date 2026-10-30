@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { Copy, FONT } from '../rules/Copy';
 import { freshRun, type RunState } from '../rules/RunState';
-import { playSfx, unlockAudio } from '../audio/Sfx';
+import { unlockAudio } from '../audio/Sfx';
+import { addPanelButton } from '../ui/PanelButton';
 
 export class CoverScene extends Phaser.Scene {
   constructor() {
@@ -10,51 +11,75 @@ export class CoverScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
-    this.cameras.main.setBackgroundColor('#1a1220');
+    this.cameras.main.setBackgroundColor('#120c18');
 
-    this.add
-      .rectangle(width / 2, height / 2, width, height, 0x241830)
-      .setStrokeStyle(4, 0x6b4a7a);
+    // 分区底 + vignette（非纯色块）
+    this.add.rectangle(width / 2, height * 0.32, width, height * 0.64, 0x1e1428);
+    this.add.rectangle(width / 2, height * 0.72, width, height * 0.56, 0x16101e);
+    this.add.rectangle(width / 2, height / 2, width - 24, height - 24).setStrokeStyle(3, 0x6b4a7a, 0.7);
+    // 四角压暗
+    const vig = this.add.graphics().setDepth(1);
+    vig.fillStyle(0x000000, 0.35);
+    vig.fillRect(0, 0, width, 80);
+    vig.fillRect(0, height - 100, width, 100);
+    vig.fillStyle(0x000000, 0.2);
+    vig.fillRect(0, 0, 40, height);
+    vig.fillRect(width - 40, 0, 40, height);
 
-    this.add
-      .text(width / 2, height * 0.28, Copy.title, {
+    const title = this.add
+      .text(width / 2, height * 0.26, Copy.title, {
         fontFamily: FONT,
-        fontSize: '64px',
+        fontSize: '68px',
         color: '#ffe6a8',
+        stroke: '#3a2030',
+        strokeThickness: 8,
+        shadow: { offsetX: 0, offsetY: 4, color: '#000000', blur: 8, fill: true },
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(2)
+      .setScale(0.85)
+      .setAlpha(0);
+    this.tweens.add({ targets: title, alpha: 1, scale: 1, duration: 420, ease: 'Back.easeOut' });
 
     this.add
-      .text(width / 2, height * 0.38, Copy.tagline, {
+      .text(width / 2, height * 0.36, Copy.tagline, {
         fontFamily: FONT,
         fontSize: '22px',
         color: '#c8b4d8',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(2);
 
     const run = freshRun();
+    // 最高分卡片
     this.add
-      .text(width / 2, height * 0.48, `${Copy.best} ${run.bestScore}`, {
-        fontFamily: FONT,
-        fontSize: '20px',
-        color: '#9a88aa',
-      })
-      .setOrigin(0.5);
-
-    const btn = this.add
-      .rectangle(width / 2, height * 0.62, 320, 72, 0xc45c26)
-      .setStrokeStyle(3, 0xffd080)
-      .setInteractive({ useHandCursor: true });
-
+      .rectangle(width / 2, height * 0.46, 280, 52, 0x2a1c38, 0.92)
+      .setStrokeStyle(2, 0x8a6098)
+      .setDepth(2);
     this.add
-      .text(width / 2, height * 0.62, Copy.play, {
+      .text(width / 2, height * 0.46, `${Copy.best}  ${run.bestScore}`, {
         fontFamily: FONT,
-        fontSize: '32px',
-        color: '#fff8e8',
+        fontSize: '22px',
+        color: '#ffe080',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(3);
 
-    btn.on('pointerdown', () => { unlockAudio(); playSfx('ui'); this.startCombat(run); });
+    addPanelButton(this, {
+      x: width / 2,
+      y: height * 0.62,
+      w: 340,
+      h: 76,
+      fill: 0xc45c26,
+      label: Copy.play,
+      fontSize: '32px',
+      depth: 5,
+      sfx: 'button',
+      onPress: () => {
+        unlockAudio();
+        this.startCombat(run);
+      },
+    });
 
     this.add
       .text(
@@ -68,7 +93,8 @@ export class CoverScene extends Phaser.Scene {
           align: 'center',
         },
       )
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(2);
   }
 
   private startCombat(run: RunState) {
