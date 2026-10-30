@@ -5,6 +5,12 @@ import { CRAVING_LOCK_SEC, addCraving, dialogCravingDelta } from '../rules/Sheep
 import { playSfx, unlockAudio } from '../audio/Sfx';
 import { addPanelButton } from '../ui/PanelButton';
 import { ART, requireTex } from '../art/ArtKeys';
+import { createDialogueBox, type DialogueBox } from '../ui/DialogueBox';
+import {
+  AFTER_CHOICE_LINES,
+  LIANNIANG_CHOICES,
+  LIANNIANG_LINES,
+} from '../rules/DialogueScripts';
 
 interface DialogData {
   run: RunState;
@@ -19,7 +25,7 @@ export class DialogScene extends Phaser.Scene {
   private qteOpen = false;
   private qteBar!: Phaser.GameObjects.Rectangle;
   private qteLabel!: Phaser.GameObjects.Text;
-  private choiceRoot: Phaser.GameObjects.GameObject[] = [];
+  private box: DialogueBox | null = null;
 
   constructor() {
     super('Dialog');
@@ -30,6 +36,7 @@ export class DialogScene extends Phaser.Scene {
     this.run = data.run;
     this.qteHits = 0;
     this.qteOpen = false;
+    this.box = null;
   }
 
   create() {
@@ -39,90 +46,44 @@ export class DialogScene extends Phaser.Scene {
 
     this.add.rectangle(width / 2, height / 2, width - 40, height - 80, 0x2a1c38).setStrokeStyle(3, 0x8a6098);
 
-    // 莲娘立绘（左侧，半身偏上）
     requireTex(this, ART.lianniangIdle);
     const portrait = this.add
-      .image(width * 0.22, height * 0.42, ART.lianniangIdle)
+      .image(width * 0.22, height * 0.38, ART.lianniangIdle)
       .setOrigin(0.5, 0.55)
       .setDepth(2)
       .setAlpha(0.95);
-    const ph = Math.min(420, height * 0.48);
+    const ph = Math.min(400, height * 0.44);
     portrait.setDisplaySize((portrait.width / portrait.height) * ph, ph);
-    this.add.ellipse(width * 0.22, height * 0.62, 140, 28, 0xc8a0d8, 0.22).setDepth(1);
+    this.add.ellipse(width * 0.22, height * 0.58, 140, 28, 0xc8a0d8, 0.22).setDepth(1);
 
-    const title = this.add
-      .text(width * 0.62, 110, Copy.dialogTitle, {
+    this.add
+      .text(width * 0.62, 90, Copy.dialogTitle, {
         fontFamily: FONT,
-        fontSize: '36px',
+        fontSize: '32px',
         color: '#ffd0e8',
         stroke: '#2a1030',
         strokeThickness: 5,
       })
       .setOrigin(0.5)
-      .setDepth(3)
-      .setScale(0.8)
-      .setAlpha(0);
-    this.tweens.add({ targets: title, alpha: 1, scale: 1, duration: 320, ease: 'Back.easeOut' });
-
-    this.add
-      .text(width * 0.62, 180, Copy.dialogBody, {
-        fontFamily: FONT,
-        fontSize: '20px',
-        color: '#e8d8f0',
-        align: 'center',
-        wordWrap: { width: width * 0.5 },
-      })
-      .setOrigin(0.5, 0)
       .setDepth(3);
 
-    this.drawChoices();
+    this.box = createDialogueBox(this, { depth: 20 });
+    this.box.playLines(LIANNIANG_LINES, () => this.offerChoices());
   }
 
-  private drawChoices() {
-    const { width } = this.scale;
-    const items: { id: ChoiceId; label: string; tip: string }[] = [
-      { id: 'feed', label: Copy.choiceFeed, tip: Copy.choiceFeedTip },
-      { id: 'boast', label: Copy.choiceBoast, tip: Copy.choiceBoastTip },
-      { id: 'exorcise', label: Copy.choiceExorcise, tip: Copy.choiceExorciseTip },
-    ];
-    items.forEach((it, i) => {
-      const y = 420 + i * 110;
-      const btn = addPanelButton(this, {
-        x: width / 2,
-        y,
-        w: 520,
-        h: 88,
-        fill: 0x3e2a52,
-        stroke: 0xc8a0d8,
-        label: it.label,
-        fontSize: '28px',
-        onPress: () => this.pick(it.id),
-      });
-      btn.label.setY(y - 14);
-      const tip = this.add
-        .text(width / 2, y + 22, it.tip, {
-          fontFamily: FONT,
-          fontSize: '16px',
-          color: '#b0a0c0',
-        })
-        .setOrigin(0.5)
-        .setDepth(12);
-      this.choiceRoot.push(btn.panel, btn.label, tip);
-    });
-  }
-
-  private clearChoices() {
-    for (const g of this.choiceRoot) g.destroy();
-    this.choiceRoot = [];
+  private offerChoices() {
+    if (!this.box) throw new Error('[Dialog] box missing before choices');
+    this.box.showChoices(LIANNIANG_CHOICES, (id) => this.pick(id));
   }
 
   private pick(id: ChoiceId) {
     if (id === 'exorcise') {
-      this.clearChoices();
+      this.box?.destroy();
+      this.box = null;
       this.startQte();
       return;
     }
-    this.finish(id, false);
+    this.playAftermath(id, false);
   }
 
   private startQte() {
@@ -138,7 +99,8 @@ export class DialogScene extends Phaser.Scene {
         stroke: '#1a1020',
         strokeThickness: 4,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(10);
 
     this.qteLabel = this.add
       .text(width / 2, height * 0.5, `0 / ${QTE_NEED}`, {
@@ -146,12 +108,13 @@ export class DialogScene extends Phaser.Scene {
         fontSize: '28px',
         color: '#ffffff',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(10);
 
-    this.add.rectangle(width / 2, height * 0.58, 400, 24, 0x3a2848);
-    this.qteBar = this.add.rectangle(width / 2 - 200, height * 0.58, 0, 24, 0x70d070).setOrigin(0, 0.5);
-    this.add.rectangle(width / 2, height * 0.62, 400, 10, 0x3a2848);
-    const timerFill = this.add.rectangle(width / 2 - 200, height * 0.62, 400, 10, 0xffd070).setOrigin(0, 0.5);
+    this.add.rectangle(width / 2, height * 0.58, 400, 24, 0x3a2848).setDepth(10);
+    this.qteBar = this.add.rectangle(width / 2 - 200, height * 0.58, 0, 24, 0x70d070).setOrigin(0, 0.5).setDepth(11);
+    this.add.rectangle(width / 2, height * 0.62, 400, 10, 0x3a2848).setDepth(10);
+    const timerFill = this.add.rectangle(width / 2 - 200, height * 0.62, 400, 10, 0xffd070).setOrigin(0, 0.5).setDepth(11);
     this.tweens.add({ targets: timerFill, width: 0, duration: QTE_SEC * 1000, ease: 'Linear' });
 
     addPanelButton(this, {
@@ -163,6 +126,7 @@ export class DialogScene extends Phaser.Scene {
       label: '连点！',
       fontSize: '32px',
       sfx: 'none',
+      depth: 12,
       onPress: () => this.qteTap(),
     });
 
@@ -193,9 +157,9 @@ export class DialogScene extends Phaser.Scene {
           stroke: '#102018',
           strokeThickness: 4,
         })
-        .setOrigin(0.5);
-      this.time.delayedCall(450, () => this.finish('exorcise', true));
-      return;
+        .setOrigin(0.5)
+        .setDepth(15);
+      this.time.delayedCall(450, () => this.playAftermath('exorcise', true));
     }
   }
 
@@ -211,12 +175,24 @@ export class DialogScene extends Phaser.Scene {
         stroke: '#201010',
         strokeThickness: 4,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(15);
     this.cameras.main.shake(150, 0.01);
-    this.time.delayedCall(500, () => this.finish('exorcise', false));
+    this.time.delayedCall(500, () => this.playAftermath('exorcise', false));
+  }
+
+  private playAftermath(choice: ChoiceId, bossBreak: boolean) {
+    const key =
+      choice === 'feed' ? 'feed' : choice === 'boast' ? 'boast' : bossBreak ? 'exorcise_ok' : 'exorcise_fail';
+    const lines = AFTER_CHOICE_LINES[key];
+    this.box?.destroy();
+    this.box = createDialogueBox(this, { depth: 25 });
+    this.box.playLines(lines, () => this.finish(choice, bossBreak));
   }
 
   private finish(choice: ChoiceId, bossBreak: boolean) {
+    this.box?.destroy();
+    this.box = null;
     const buffs = buffsFromChoice(choice, bossBreak);
     this.run.choice = buffs.choice;
     this.run.ending = buffs.ending;

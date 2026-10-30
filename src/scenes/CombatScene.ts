@@ -26,6 +26,8 @@ import {
   victimFlash,
 } from '../combat/Juice';
 import { ART, DISPLAY_H, requireTex } from '../art/ArtKeys';
+import { createDialogueBox } from '../ui/DialogueBox';
+import { BOSS_OPEN_LINES, WAVE2_LINES } from '../rules/DialogueScripts';
 import { addPanelButton, type PanelButton } from '../ui/PanelButton';
 import {
   CHARGE_FRAMES,
@@ -246,13 +248,24 @@ export class CombatScene extends Phaser.Scene {
       this.run.phase = 'boss';
       this.spawnBoss();
       if (this.run.bossBreak) this.toast('莲娘驱邪成功！Boss 破防');
-      this.time.delayedCall(600, () => this.toast(Copy.mirrorHint));
     }
 
     this.buildControls();
     this.bindKeys();
-    this.running = true;
     this.refreshHud();
+
+    if (this.mode === 'boss') {
+      // Boss 开场对白：暂停后再开打
+      this.running = false;
+      const box = createDialogueBox(this, { depth: 50 });
+      box.playLines(BOSS_OPEN_LINES, () => {
+        box.destroy();
+        this.toast(Copy.mirrorHint);
+        this.running = true;
+      });
+    } else {
+      this.running = true;
+    }
   }
 
   private cx() {
@@ -616,8 +629,12 @@ export class CombatScene extends Phaser.Scene {
     };
     this.keys.atk.on('down', () => this.pressAttack());
     this.keys.atk.on('up', () => this.releaseAttack());
-    this.keys.dodge.on('down', () => { this.bufferedDodge = true; });
-    this.keys.rake.on('down', () => { this.bufferedRake = true; });
+    this.keys.dodge.on('down', () => {
+      if (this.running) this.bufferedDodge = true;
+    });
+    this.keys.rake.on('down', () => {
+      if (this.running) this.bufferedRake = true;
+    });
   }
 
   update(_t: number, delta: number) {
@@ -705,11 +722,17 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private pressAttack() {
+    if (!this.running) return;
     this.attackHeld = 1;
     this.charging = false;
   }
 
   private releaseAttack() {
+    if (!this.running) {
+      this.attackHeld = 0;
+      this.charging = false;
+      return;
+    }
     if (this.attackHeld <= 0) return;
     if (this.charging && this.run.rakeCd <= 0) {
       if (this.run.cravingLockLeft > 0) {
@@ -1176,13 +1199,17 @@ export class CombatScene extends Phaser.Scene {
     if (this.wave === 1) {
       this.wave = 2;
       this.waveSpawning = true;
-      this.toast(Copy.wave2);
+      this.running = false;
       playSfx('phase');
-      this.time.delayedCall(700, () => {
-        if (!this.running) return;
+      this.toast(Copy.wave2);
+      const box = createDialogueBox(this, { depth: 50 });
+      box.playLines(WAVE2_LINES, () => {
+        box.destroy();
+        if (this.run.phase !== 'trash') return;
         this.enemies = [];
         this.spawnWave(2);
         this.waveSpawning = false;
+        this.running = true;
       });
       return;
     }

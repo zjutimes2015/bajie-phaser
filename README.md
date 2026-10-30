@@ -1,6 +1,6 @@
 # 八戒下山（Phaser 3 重做）
 
-竖屏 HTML5 可玩原型：封面 → 清小怪 → 莲娘三选 → Boss 镜花将军 → 胜负结算。  
+竖屏 HTML5 可玩原型：封面对白 → 清小怪（波次对白）→ 莲娘对白三选 → Boss 对白 → 胜负结算。  
 规则与文案从 Cocos 版 `/workspace/bajie-downhill` 的 `SheepV1` / `Copy` 原样迁入。
 
 ## 为什么用 Phaser（不是八引擎合体）
@@ -49,7 +49,9 @@ src/art/ArtKeys.ts          纹理 key + 显示高度
 src/scenes/BootScene.ts     预载立绘 → Cover
 src/scenes/CoverScene.ts    封面（八戒主视觉）
 src/scenes/CombatScene.ts   小怪 + Boss 战斗（多帧换图）
-src/scenes/DialogScene.ts   莲娘三选 + 驱邪 QTE
+src/ui/DialogueBox.ts       打字机对白盒（名牌/点推/选项）
+src/rules/DialogueScripts.ts 开场/波次/莲娘/Boss 中文脚本
+src/scenes/DialogScene.ts   莲娘对白流 + 三选 + 驱邪 QTE
 src/scenes/ResultScene.ts   胜负 / 再来 / 分享 / 广告续命
 public/art/characters/      透明 PNG 立绘（idle/atk/hurt）
 tools/prepare_art.py        抠紫底 + 脚底居中 + 小妖左右拆
@@ -85,7 +87,7 @@ tools/verify_sheep_v1.mjs   Node 单测
 |---|---|
 | Cover→Combat→Dialog→Boss→Result 全流程 | 微信正式 AppID / 开发者工具上传 |
 | 戒心槽、完美闪避反击、Boss 70%/40% 阶段 | 流量主 adUnitId（`WxBridge` 空串 → mock） |
-| 莲娘三选 + QTE | 骨骼动画 / 多方向走帧（现静帧换图） |
+| 莲娘对白流 + 三选 + QTE；开场/波次/Boss 短对白 | 骨骼动画 / 多方向走帧（现静帧换图） |
 | 浏览器分享 clipboard mock | 战绩卡 Canvas 美化 |
 | `npm test` SheepV1 | 微信适配器打包 |
 
@@ -106,6 +108,29 @@ GitHub 对标：[Universal-LPC](https://github.com/LiberatedPixelCup/Universal-L
 - 许可证：自用（本仓角色图，勿当第三方 LPC 资产再分发）。
 
 **诚实差距**：无骨骼动画、无多方向走帧、无 atlas 合图管线；暗场高对比立绘在战斗里靠脚下色盘托轮廓。
+
+
+## 对话（v1.3 · 打字机 + 点推 + 三选）
+
+GitHub 对标（学模式，不整库搬）：
+
+| 仓库 | stars | 学到的模式 |
+|---|---|---|
+| [lizgw/phaser-ink-demo](https://github.com/lizgw/phaser-ink-demo) | 17 | `continueStory` → `createChoices` → `choiceClick` |
+| [juwalbose/phaser3_visualnovelengine](https://github.com/juwalbose/phaser3_visualnovelengine) | 7 | JSON 行驱动、speaker、最多 6 选项、立绘情绪切 |
+| [robingamedev/visual-novel-dialogue](https://github.com/robingamedev/visual-novel-dialogue) | npm 插件 | nameplate + typewriter + tap skip/advance + label 跳转 |
+
+本仓实现：`src/ui/DialogueBox.ts` + `src/rules/DialogueScripts.ts`（不引 inkjs）。
+
+### 怎么玩对话
+
+1. 封面点「开始闯荡」→ **开场三句**（打字机，点屏幕 / 空格 / Z 跳过或推进）
+2. 清完第一波 → **波次间一句**，再刷第二波
+3. 清完小怪 → **莲娘多句对白** → 三选（送斋饭 / 吹牛皮 / 驱邪）；驱邪仍进 QTE
+4. 三选结算后 → **短反应对白** → Boss
+5. Boss 开场 → **镜花对吼两句**，再开打
+
+文案全中文；不是完整视觉小说。
 
 ## 心法
 

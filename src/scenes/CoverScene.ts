@@ -2,15 +2,22 @@ import Phaser from 'phaser';
 import { Copy, FONT } from '../rules/Copy';
 import { freshRun, type RunState } from '../rules/RunState';
 import { unlockAudio } from '../audio/Sfx';
-import { addPanelButton } from '../ui/PanelButton';
+import { addPanelButton, type PanelButton } from '../ui/PanelButton';
 import { ART, requireTex } from '../art/ArtKeys';
+import { createDialogueBox } from '../ui/DialogueBox';
+import { INTRO_LINES } from '../rules/DialogueScripts';
 
 export class CoverScene extends Phaser.Scene {
+  private playBtn: PanelButton | null = null;
+  private starting = false;
+
   constructor() {
     super('Cover');
   }
 
   create() {
+    this.starting = false;
+    this.playBtn = null;
     const { width, height } = this.scale;
     this.cameras.main.setBackgroundColor('#120c18');
 
@@ -18,7 +25,6 @@ export class CoverScene extends Phaser.Scene {
     this.add.rectangle(width / 2, height * 0.72, width, height * 0.56, 0x16101e);
     this.add.rectangle(width / 2, height / 2, width - 24, height - 24).setStrokeStyle(3, 0x6b4a7a, 0.7);
 
-    // 八戒全身主视觉（偏下，不挡标题/按钮）
     requireTex(this, ART.bajieIdle);
     const hero = this.add
       .image(width / 2, height * 0.58, ART.bajieIdle)
@@ -27,10 +33,7 @@ export class CoverScene extends Phaser.Scene {
       .setAlpha(0.92);
     const targetH = Math.min(520, height * 0.52);
     hero.setDisplaySize((hero.width / hero.height) * targetH, targetH);
-    // 脚下柔光
-    this.add
-      .ellipse(width / 2, height * 0.78, 220, 36, 0xc45c26, 0.25)
-      .setDepth(0);
+    this.add.ellipse(width / 2, height * 0.78, 220, 36, 0xc45c26, 0.25).setDepth(0);
 
     const vig = this.add.graphics().setDepth(2);
     vig.fillStyle(0x000000, 0.35);
@@ -78,7 +81,7 @@ export class CoverScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(4);
 
-    addPanelButton(this, {
+    this.playBtn = addPanelButton(this, {
       x: width / 2,
       y: height * 0.86,
       w: 340,
@@ -88,10 +91,7 @@ export class CoverScene extends Phaser.Scene {
       fontSize: '32px',
       depth: 5,
       sfx: 'button',
-      onPress: () => {
-        unlockAudio();
-        this.startCombat(run);
-      },
+      onPress: () => this.beginIntro(run),
     });
 
     this.add
@@ -103,6 +103,22 @@ export class CoverScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(3);
+  }
+
+  /** 开战前短对白，再进战斗（玩家能感到「有对话」）。 */
+  private beginIntro(run: RunState) {
+    if (this.starting) return;
+    this.starting = true;
+    unlockAudio();
+    this.playBtn?.setEnabled(false);
+    this.playBtn?.panel.setVisible(false);
+    this.playBtn?.label.setVisible(false);
+
+    const box = createDialogueBox(this, { depth: 30 });
+    box.playLines(INTRO_LINES, () => {
+      box.destroy();
+      this.startCombat(run);
+    });
   }
 
   private startCombat(run: RunState) {
