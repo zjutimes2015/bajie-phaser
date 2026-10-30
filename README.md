@@ -22,6 +22,13 @@
 
 Spec：仓库旁 `../specs/bajie-wechat-spec-a.md`（或你本地同路径）。
 
+## 在线试玩
+
+**公网 Demo：** https://zjutimes2015.github.io/bajie-phaser/
+
+GitHub Pages（`gh-pages` 分支，内容来自 `npm run build` 的 `dist/`）。
+竖屏最佳；音效需先点一下页面（浏览器自动播放策略）。
+
 ## 怎么玩
 
 ```bash
