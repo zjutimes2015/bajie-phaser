@@ -4,6 +4,7 @@ import { buffsFromChoice, type ChoiceId, type RunState } from '../rules/RunState
 import { CRAVING_LOCK_SEC, addCraving, dialogCravingDelta } from '../rules/SheepV1';
 import { playSfx, unlockAudio } from '../audio/Sfx';
 import { addPanelButton } from '../ui/PanelButton';
+import { ART, requireTex } from '../art/ArtKeys';
 
 interface DialogData {
   run: RunState;
@@ -38,28 +39,41 @@ export class DialogScene extends Phaser.Scene {
 
     this.add.rectangle(width / 2, height / 2, width - 40, height - 80, 0x2a1c38).setStrokeStyle(3, 0x8a6098);
 
+    // 莲娘立绘（左侧，半身偏上）
+    requireTex(this, ART.lianniangIdle);
+    const portrait = this.add
+      .image(width * 0.22, height * 0.42, ART.lianniangIdle)
+      .setOrigin(0.5, 0.55)
+      .setDepth(2)
+      .setAlpha(0.95);
+    const ph = Math.min(420, height * 0.48);
+    portrait.setDisplaySize((portrait.width / portrait.height) * ph, ph);
+    this.add.ellipse(width * 0.22, height * 0.62, 140, 28, 0xc8a0d8, 0.22).setDepth(1);
+
     const title = this.add
-      .text(width / 2, 120, Copy.dialogTitle, {
+      .text(width * 0.62, 110, Copy.dialogTitle, {
         fontFamily: FONT,
-        fontSize: '40px',
+        fontSize: '36px',
         color: '#ffd0e8',
         stroke: '#2a1030',
         strokeThickness: 5,
       })
       .setOrigin(0.5)
+      .setDepth(3)
       .setScale(0.8)
       .setAlpha(0);
     this.tweens.add({ targets: title, alpha: 1, scale: 1, duration: 320, ease: 'Back.easeOut' });
 
     this.add
-      .text(width / 2, 220, Copy.dialogBody, {
+      .text(width * 0.62, 180, Copy.dialogBody, {
         fontFamily: FONT,
-        fontSize: '22px',
+        fontSize: '20px',
         color: '#e8d8f0',
         align: 'center',
-        wordWrap: { width: width - 120 },
+        wordWrap: { width: width * 0.5 },
       })
-      .setOrigin(0.5, 0);
+      .setOrigin(0.5, 0)
+      .setDepth(3);
 
     this.drawChoices();
   }

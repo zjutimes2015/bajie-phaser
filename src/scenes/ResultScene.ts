@@ -6,6 +6,7 @@ import { playRewardedAd, shareText } from '../rules/WxBridge';
 import { playSfx, unlockAudio } from '../audio/Sfx';
 import { addPanelButton } from '../ui/PanelButton';
 import { CombatScene } from './CombatScene';
+import { ART, requireTex } from '../art/ArtKeys';
 
 interface ResultData {
   run: RunState;
@@ -34,6 +35,16 @@ export class ResultScene extends Phaser.Scene {
     this.run.bestScore = Math.max(this.run.bestScore, this.run.score);
 
     this.add.rectangle(width / 2, height / 2, width - 28, height - 40, 0x1e1428).setStrokeStyle(3, 0x6b4a7a);
+
+    requireTex(this, ART.bajieIdle);
+    const hero = this.add
+      .image(width * 0.18, height * 0.42, ART.bajieIdle)
+      .setOrigin(0.5, 0.55)
+      .setDepth(1)
+      .setAlpha(won ? 0.9 : 0.55);
+    const hh = Math.min(340, height * 0.4);
+    hero.setDisplaySize((hero.width / hero.height) * hh, hh);
+    if (!won) hero.setTint(0x886688);
 
     const title = won ? Copy.winTitle : Copy.loseTitle;
     const subtitle = won

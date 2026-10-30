@@ -45,11 +45,14 @@ src/rules/WxBridge.ts       分享/激励广告：有 wx 调真，否则 mock
 src/audio/Sfx.ts            Oscillator 短音效
 src/combat/Frames.ts        60Hz 帧表 + 动作状态机
 src/combat/Juice.ts         同帧多层反馈 / 残影 / 扬尘
-src/scenes/BootScene.ts     启动
-src/scenes/CoverScene.ts    封面
-src/scenes/CombatScene.ts   小怪 + Boss 战斗
+src/art/ArtKeys.ts          纹理 key + 显示高度
+src/scenes/BootScene.ts     预载立绘 → Cover
+src/scenes/CoverScene.ts    封面（八戒主视觉）
+src/scenes/CombatScene.ts   小怪 + Boss 战斗（多帧换图）
 src/scenes/DialogScene.ts   莲娘三选 + 驱邪 QTE
 src/scenes/ResultScene.ts   胜负 / 再来 / 分享 / 广告续命
+public/art/characters/      透明 PNG 立绘（idle/atk/hurt）
+tools/prepare_art.py        抠紫底 + 脚底居中 + 小妖左右拆
 tools/verify_sheep_v1.mjs   Node 单测
 ```
 
@@ -67,7 +70,7 @@ tools/verify_sheep_v1.mjs   Node 单测
 敌人完美窗 = 前摇末 **5** 逻辑帧（贴判定落地）。  
 表现：anticipate→strike→settle、闪避残影、扬尘、钉耙闪屏。
 
-**诚实差距**：无英雄池/皮肤/帧同步联网/正式 Spine；这是单机竖屏原型的「打击感骨架」，不是《王者荣耀》还原。
+**诚实差距**：无英雄池/皮肤/帧同步联网/骨骼动画；这是单机竖屏原型的「打击感骨架 + 静帧换图」，不是《王者荣耀》还原。
 
 ## 手感深化（v1.1）
 
@@ -82,9 +85,27 @@ tools/verify_sheep_v1.mjs   Node 单测
 |---|---|
 | Cover→Combat→Dialog→Boss→Result 全流程 | 微信正式 AppID / 开发者工具上传 |
 | 戒心槽、完美闪避反击、Boss 70%/40% 阶段 | 流量主 adUnitId（`WxBridge` 空串 → mock） |
-| 莲娘三选 + QTE | Spine / 正式立绘（现色块） |
+| 莲娘三选 + QTE | 骨骼动画 / 多方向走帧（现静帧换图） |
 | 浏览器分享 clipboard mock | 战绩卡 Canvas 美化 |
 | `npm test` SheepV1 | 微信适配器打包 |
+
+
+## 美术（v1.2 · Universal-LPC 思路，非 Spine）
+
+GitHub 对标：[Universal-LPC](https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator)（多帧动作表换图，不整库搬西幻 LPC 脸）。
+
+| 角色 | 帧 |
+|---|---|
+| 八戒 | idle / atk / hurt |
+| 小妖近战·远程 | idle / atk（合板左右拆） |
+| 镜花 Boss | idle / atk |
+| 莲娘 | idle（对话立绘） |
+
+- 素材：Cocos 工程自产 idle 立绘 + 本轮生成动作帧；`tools/prepare_art.py` 抠近 `#1a1220` 紫底为透明、提亮、脚底落画布。
+- **不是** Spine / `.skel`；战斗用 `Image` 按状态切纹理 + `flipX` 朝向。
+- 许可证：自用（本仓角色图，勿当第三方 LPC 资产再分发）。
+
+**诚实差距**：无骨骼动画、无多方向走帧、无 atlas 合图管线；暗场高对比立绘在战斗里靠脚下色盘托轮廓。
 
 ## 心法
 

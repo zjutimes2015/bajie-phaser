@@ -15,7 +15,6 @@ import {
 import type { RunState } from '../rules/RunState';
 import { playSfx, unlockAudio } from '../audio/Sfx';
 import {
-  afterimage,
   dustPuff,
   floatDmg,
   hitConnectFx,
@@ -23,8 +22,10 @@ import {
   playAttackMotion,
   popScale,
   shake,
+  spriteAfterimage,
   victimFlash,
 } from '../combat/Juice';
+import { ART, DISPLAY_H, requireTex } from '../art/ArtKeys';
 import { addPanelButton, type PanelButton } from '../ui/PanelButton';
 import {
   CHARGE_FRAMES,
@@ -64,7 +65,13 @@ interface Fighter {
   dashVx: number;
   /** 受击硬直逻辑帧 */
   freeze: number;
-  body: Phaser.GameObjects.Rectangle;
+  /** 显示精灵（逻辑碰撞仍用 w/h） */
+  body: Phaser.GameObjects.Image;
+  /** 脚下色盘，暗场里托出轮廓 */
+  pedestal: Phaser.GameObjects.Ellipse;
+  idleKey: string;
+  atkKey: string;
+  hurtKey: string | null;
   nameText: Phaser.GameObjects.Text;
   hpText: Phaser.GameObjects.Text;
   danger?: Phaser.GameObjects.Arc | Phaser.GameObjects.Rectangle;
@@ -383,6 +390,13 @@ export class CombatScene extends Phaser.Scene {
     return f;
   }
 
+  private artKeysFor(kind: Kind): { idle: string; atk: string; hurt: string | null } {
+    if (kind === 'player') return { idle: ART.bajieIdle, atk: ART.bajieAtk, hurt: ART.bajieHurt };
+    if (kind === 'boss') return { idle: ART.bossIdle, atk: ART.bossAtk, hurt: null };
+    if (kind === 'ranged') return { idle: ART.mobRangedIdle, atk: ART.mobRangedAtk, hurt: null };
+    return { idle: ART.mobMeleeIdle, atk: ART.mobMeleeAtk, hurt: null };
+  }
+
   private makeFighter(
     kind: Kind,
     x: number,
@@ -394,13 +408,37 @@ export class CombatScene extends Phaser.Scene {
     color: number,
     name: string,
   ): Fighter {
-    const body = this.add.rectangle(x, y, w, h, color).setStrokeStyle(2, 0xffffff, 0.3);
+    const keys = this.artKeysFor(kind);
+    requireTex(this, keys.idle);
+    requireTex(this, keys.atk);
+    if (keys.hurt) requireTex(this, keys.hurt);
+    const dispH = DISPLAY_H[kind === 'player' ? 'player' : kind];
+    const body = this.add.image(x, y, keys.idle).setOrigin(0.5, 0.55).setDepth(5);
+    body.setDisplaySize((body.width / body.height) * dispH, dispH);
+    const pedestal = this.add
+      .ellipse(x, y + dispH * 0.42, Math.max(56, w * 0.95), 18, color, 0.35)
+      .setStrokeStyle(1, 0xffffff, 0.15)
+      .setDepth(4);
     const nameText = this.add
-      .text(x, y - h / 2 - 18, name, { fontFamily: FONT, fontSize: '16px', color: '#ffffff' })
-      .setOrigin(0.5);
+      .text(x, y - dispH * 0.55, name, {
+        fontFamily: FONT,
+        fontSize: '16px',
+        color: '#ffffff',
+        stroke: '#1a1020',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(6);
     const hpText = this.add
-      .text(x, y + h / 2 + 14, '', { fontFamily: FONT, fontSize: '14px', color: '#ffe6b4' })
-      .setOrigin(0.5);
+      .text(x, y + dispH * 0.48, '', {
+        fontFamily: FONT,
+        fontSize: '14px',
+        color: '#ffe6b4',
+        stroke: '#1a1020',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(6);
     return {
       kind,
       hp,
@@ -420,6 +458,10 @@ export class CombatScene extends Phaser.Scene {
       dashVx: 0,
       freeze: 0,
       body,
+      pedestal,
+      idleKey: keys.idle,
+      atkKey: keys.atk,
+      hurtKey: keys.hurt,
       nameText,
       hpText,
     };
@@ -427,19 +469,54 @@ export class CombatScene extends Phaser.Scene {
 
   private place(f: Fighter) {
     f.body.setPosition(f.x, f.y);
-    f.nameText.setPosition(f.x, f.y - f.h / 2 - 18);
-    f.hpText.setPosition(f.x, f.y + f.h / 2 + 14);
+    f.pedestal.setPosition(f.x, f.y + f.body.displayHeight * 0.42);
+    f.nameText.setPosition(f.x, f.y - f.body.displayHeight * 0.55);
+    f.hpText.setPosition(f.x, f.y + f.body.displayHeight * 0.48);
     if (f.danger) {
       if (f.move === 'sweep') f.danger.setPosition(f.x, f.y);
-      else f.danger.setPosition(f.x, f.y - f.h / 2 - 8);
+      else f.danger.setPosition(f.x, f.y - f.body.displayHeight * 0.55);
     }
   }
 
   private refreshFighter(f: Fighter) {
     f.hpText.setText(`${Math.ceil(f.hp)}/${f.maxHp}`);
     f.body.setVisible(!f.dead);
+    f.pedestal.setVisible(!f.dead);
     f.nameText.setVisible(!f.dead);
     f.hpText.setVisible(!f.dead);
+  }
+
+  /** Universal-LPC-style: swap plate by combat state. */
+  private setFighterFrame(f: Fighter, key: string) {
+    if (f.body.texture.key === key) return;
+    requireTex(this, key);
+    const dh = f.body.displayHeight;
+    const dw = f.body.displayWidth;
+    f.body.setTexture(key);
+    f.body.setDisplaySize(dw, dh);
+  }
+
+  private syncFighterArt(f: Fighter, facingHint?: number) {
+    if (f.dead) return;
+    if (facingHint !== undefined) {
+      // art faces right by default; flip when facing left
+      f.body.setFlipX(facingHint < 0);
+    }
+    if (f.kind === 'player') {
+      if (f.freeze > 0 && f.hurtKey) this.setFighterFrame(f, f.hurtKey);
+      else if (
+        this.action.kind !== 'none' &&
+        this.action.kind !== 'dodge' &&
+        (this.action.phase === 'startup' || this.action.phase === 'active')
+      ) {
+        this.setFighterFrame(f, f.atkKey);
+      } else {
+        this.setFighterFrame(f, f.idleKey);
+      }
+      return;
+    }
+    if (f.windup > 0) this.setFighterFrame(f, f.atkKey);
+    else this.setFighterFrame(f, f.idleKey);
   }
 
   private buildControls() {
@@ -709,7 +786,7 @@ export class CombatScene extends Phaser.Scene {
 
     const leap = this.moveDir !== 0 ? this.moveDir * 80 : this.facing * 70;
     this.facing = leap >= 0 ? 1 : -1;
-    afterimage(this, this.player.x, this.player.y, this.player.w, this.player.h, COLORS.player);
+    spriteAfterimage(this, this.player.body, COLORS.player);
     dustPuff(this, this.player.x, this.player.y);
     playSfx('dodge');
     this.player.x = Phaser.Math.Clamp(
@@ -743,7 +820,7 @@ export class CombatScene extends Phaser.Scene {
         this.resolvePlayerHit();
       }
       if (this.action.kind === 'dodge') {
-        afterimage(this, this.player.x, this.player.y, this.player.w, this.player.h, COLORS.player);
+        spriteAfterimage(this, this.player.body, COLORS.player);
       }
     }
   }
@@ -785,7 +862,6 @@ export class CombatScene extends Phaser.Scene {
   }
 
   private presentLerp() {
-    // 表现层：把 body 缓到逻辑坐标（轻插值）
     for (const f of [this.player, ...this.enemies]) {
       if (!f || f.dead) continue;
       const bx = f.body.x;
@@ -793,12 +869,18 @@ export class CombatScene extends Phaser.Scene {
       const nx = bx + (f.x - bx) * 0.45;
       const ny = by + (f.y - by) * 0.45;
       f.body.setPosition(nx, ny);
-      f.nameText.setPosition(nx, ny - f.h / 2 - 18);
-      f.hpText.setPosition(nx, ny + f.h / 2 + 14);
+      f.pedestal.setPosition(nx, ny + f.body.displayHeight * 0.42);
+      f.nameText.setPosition(nx, ny - f.body.displayHeight * 0.55);
+      f.hpText.setPosition(nx, ny + f.body.displayHeight * 0.48);
       if (f.danger) {
         if (f.move === 'sweep') f.danger.setPosition(nx, ny);
-        else f.danger.setPosition(nx, ny - f.h / 2 - 8);
+        else f.danger.setPosition(nx, ny - f.body.displayHeight * 0.55);
       }
+      const face =
+        f.kind === 'player'
+          ? this.facing
+          : Math.sign(this.player.x - f.x) || 1;
+      this.syncFighterArt(f, face);
     }
   }
 
@@ -849,9 +931,7 @@ export class CombatScene extends Phaser.Scene {
       this.run.score += bonus;
       this.clearDanger(e);
       this.tweens.add({
-        targets: [e.body],
-        scaleX: 0.1,
-        scaleY: 0.1,
+        targets: [e.body, e.pedestal, e.nameText, e.hpText],
         alpha: 0,
         duration: 180,
         onComplete: () => this.refreshFighter(e),
@@ -929,7 +1009,7 @@ export class CombatScene extends Phaser.Scene {
   private startWindup(e: Fighter, frames: number, move: BossMove | 'melee' | 'ranged') {
     e.windup = frames;
     e.windupMax = frames;
-    e.body.setFillStyle(0xff6030);
+    e.body.setTint(0xff8060);
     this.clearDanger(e);
     if (move === 'sweep') {
       e.danger = this.add
@@ -1028,7 +1108,8 @@ export class CombatScene extends Phaser.Scene {
 
   private resolveEnemyAttack(e: Fighter) {
     this.clearDanger(e);
-    e.body.setFillStyle(e.baseColor);
+    e.body.clearTint();
+    this.setFighterFrame(e, e.idleKey);
     e.dashVx = 0;
 
     let range = 100;

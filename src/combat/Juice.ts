@@ -5,7 +5,8 @@ import { FONT } from '../rules/Copy';
 
 /** 同帧多层反馈 + 表现层 tween（逻辑层不管这些）。 */
 
-/** trauma 分层震屏：轻/重/完美 */
+type BodyLike = Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
+
 const SHAKE: Record<AttackTier, { intensity: number; ms: number }> = {
   light: { intensity: 0.007, ms: 85 },
   rake: { intensity: 0.02, ms: 210 },
@@ -27,7 +28,6 @@ export function screenFlash(scene: Phaser.Scene, color = 0xfff0c0, alpha = 0.35,
   });
 }
 
-/** 按钮/拾取 pop：短促放大回弹 */
 export function popScale(
   scene: Phaser.Scene,
   target: Phaser.GameObjects.GameObject & { setScale: (x: number, y?: number) => unknown },
@@ -155,6 +155,29 @@ export function afterimage(
   });
 }
 
+/** Sprite residual: tinted copy of current texture (fallback to rect if no tex). */
+export function spriteAfterimage(scene: Phaser.Scene, body: BodyLike, color: number): void {
+  if (body instanceof Phaser.GameObjects.Image) {
+    const ghost = scene.add
+      .image(body.x, body.y, body.texture.key)
+      .setDisplaySize(body.displayWidth, body.displayHeight)
+      .setFlipX(body.flipX)
+      .setTint(color)
+      .setAlpha(0.4)
+      .setDepth(body.depth - 1);
+    scene.tweens.add({
+      targets: ghost,
+      alpha: 0,
+      scaleX: body.scaleX * 1.08,
+      scaleY: body.scaleY * 0.95,
+      duration: 180,
+      onComplete: () => ghost.destroy(),
+    });
+    return;
+  }
+  afterimage(scene, body.x, body.y, body.width, body.height, color);
+}
+
 export function dustPuff(scene: Phaser.Scene, x: number, y: number): void {
   for (let i = 0; i < 5; i++) {
     const c = scene.add.circle(x + (Math.random() - 0.5) * 20, y + 20, 3 + Math.random() * 4, 0xc8b090, 0.7);
@@ -169,7 +192,6 @@ export function dustPuff(scene: Phaser.Scene, x: number, y: number): void {
   }
 }
 
-/** 同帧多层：音效+震屏+闪白+斩击（顿帧由逻辑层 hitstopFrames 负责） */
 export function hitConnectFx(
   scene: Phaser.Scene,
   tier: AttackTier,
@@ -195,43 +217,59 @@ export function hitConnectFx(
   }
 }
 
-/** 受击闪白 */
-export function victimFlash(body: Phaser.GameObjects.Rectangle, baseColor: number, scene: Phaser.Scene): void {
-  body.setFillStyle(0xffffff);
-  scene.time.delayedCall(70, () => {
-    if (body.active) body.setFillStyle(baseColor);
-  });
+/** 受击闪白 — Image 用 tint，Rectangle 用 fill。Fail Fast on unknown type. */
+export function victimFlash(body: BodyLike, baseColor: number, scene: Phaser.Scene): void {
+  if (body instanceof Phaser.GameObjects.Image) {
+    body.setTint(0xffffff);
+    scene.time.delayedCall(70, () => {
+      if (body.active) body.clearTint();
+    });
+    return;
+  }
+  if (body instanceof Phaser.GameObjects.Rectangle) {
+    body.setFillStyle(0xffffff);
+    scene.time.delayedCall(70, () => {
+      if (body.active) body.setFillStyle(baseColor);
+    });
+    return;
+  }
+  throw new Error(`[juice] victimFlash: unsupported body type ${typeof body}`);
 }
 
-/** 攻击动作表现：anticipate → strike → settle */
+/** 攻击动作表现：anticipate → strike → settle（Image / Rectangle 均可） */
 export function playAttackMotion(
   scene: Phaser.Scene,
-  body: Phaser.GameObjects.Rectangle,
+  body: BodyLike,
   facing: number,
   tier: AttackTier,
 ): void {
+  if (!body || !('x' in body)) {
+    throw new Error('[juice] playAttackMotion: body missing');
+  }
   const back = facing * (tier === 'rake' ? -16 : -8);
   const fwd = facing * (tier === 'rake' ? 28 : 14);
+  const baseSX = body.scaleX;
+  const baseSY = body.scaleY;
   scene.tweens.killTweensOf(body);
   scene.tweens.add({
     targets: body,
     x: body.x + back,
-    scaleX: 0.92,
-    scaleY: 1.06,
+    scaleX: baseSX * 0.92,
+    scaleY: baseSY * 1.06,
     duration: tier === 'rake' ? 90 : 45,
     yoyo: false,
     onComplete: () => {
       scene.tweens.add({
         targets: body,
         x: body.x + fwd - back,
-        scaleX: 1.12,
-        scaleY: 0.9,
+        scaleX: baseSX * 1.12,
+        scaleY: baseSY * 0.9,
         duration: tier === 'rake' ? 70 : 40,
         onComplete: () => {
           scene.tweens.add({
             targets: body,
-            scaleX: 1,
-            scaleY: 1,
+            scaleX: baseSX,
+            scaleY: baseSY,
             duration: 80,
           });
         },
