@@ -42,6 +42,8 @@ src/rules/SheepV1.ts        戒心/差一点/翻车分享（纯 TS）
 src/rules/Copy.ts           中文文案 + 楷体栈
 src/rules/RunState.ts       单局数据，场景间传递
 src/rules/WxBridge.ts       分享/激励广告：有 wx 调真，否则 mock
+src/audio/Sfx.ts            Oscillator 短音效
+src/combat/Juice.ts         hitstop / shake / slash / killPop
 src/scenes/BootScene.ts     启动
 src/scenes/CoverScene.ts    封面
 src/scenes/CombatScene.ts   小怪 + Boss 战斗
@@ -49,6 +51,13 @@ src/scenes/DialogScene.ts   莲娘三选 + 驱邪 QTE
 src/scenes/ResultScene.ts   胜负 / 再来 / 分享 / 广告续命
 tools/verify_sheep_v1.mjs   Node 单测
 ```
+
+## 手感深化（v1.1）
+
+- Hitstop / 震屏 / 斩击条 / 击杀粒子 / WebAudio 哔哔
+- 小怪两波；敌人前摇变色 + 危险弧；Boss 镜光横扫 / 残影冲刺
+- 连击倍率、斋饭/金箍碎片掉落
+- HP 条、戒心 7 格、钉耙饼、Boss 血条、残血 vignette
 
 ## 已实现 / 仍是桩
 

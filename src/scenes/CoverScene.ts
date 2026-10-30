@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Copy, FONT } from '../rules/Copy';
 import { freshRun, type RunState } from '../rules/RunState';
+import { playSfx, unlockAudio } from '../audio/Sfx';
 
 export class CoverScene extends Phaser.Scene {
   constructor() {
@@ -53,7 +54,7 @@ export class CoverScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    btn.on('pointerdown', () => this.startCombat(run));
+    btn.on('pointerdown', () => { unlockAudio(); playSfx('ui'); this.startCombat(run); });
 
     this.add
       .text(

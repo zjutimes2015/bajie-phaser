@@ -3,6 +3,7 @@ import { Copy, FONT } from '../rules/Copy';
 import { shareFailText } from '../rules/SheepV1';
 import { freshRun, saveBestScore, type RunState } from '../rules/RunState';
 import { playRewardedAd, shareText } from '../rules/WxBridge';
+import { playSfx, unlockAudio } from '../audio/Sfx';
 import { CombatScene } from './CombatScene';
 
 interface ResultData {
@@ -24,7 +25,9 @@ export class ResultScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
     this.cameras.main.setBackgroundColor('#1a1220');
+    unlockAudio();
     const won = this.run.phase === 'won';
+    playSfx(won ? 'win' : 'lose');
 
     saveBestScore(this.run.score);
     this.run.bestScore = Math.max(this.run.bestScore, this.run.score);
@@ -47,19 +50,29 @@ export class ResultScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(width / 2, height * 0.32, subtitle, {
+      .text(width / 2, height * 0.30, subtitle, {
         fontFamily: FONT,
-        fontSize: '24px',
-        color: '#d0c0e0',
+        fontSize: won ? '24px' : '30px',
+        color: won ? '#d0c0e0' : '#ffd080',
         align: 'center',
         wordWrap: { width: width - 80 },
       })
       .setOrigin(0.5);
 
+    if (this.run.comboPeak > 0) {
+      this.add
+        .text(width / 2, height * 0.37, `${Copy.peakCombo} ×${this.run.comboPeak}`, {
+          fontFamily: FONT,
+          fontSize: '22px',
+          color: '#ffe080',
+        })
+        .setOrigin(0.5);
+    }
+
     this.add
       .text(
         width / 2,
-        height * 0.42,
+        height * 0.44,
         `${Copy.score} ${this.run.score}　${Copy.best} ${this.run.bestScore}`,
         {
           fontFamily: FONT,
@@ -74,13 +87,13 @@ export class ResultScene extends Phaser.Scene {
         label: won ? Copy.winAgain : Copy.loseRetry,
         y: height * 0.55,
         color: 0xc45c26,
-        fn: () => this.retry(),
+        fn: () => { playSfx('ui'); this.retry(); },
       },
       {
         label: won ? Copy.winShare : Copy.loseShare,
         y: height * 0.65,
         color: 0x3a6a98,
-        fn: () => this.share(),
+        fn: () => { playSfx('ui'); this.share(); },
       },
     ];
 
@@ -117,7 +130,9 @@ export class ResultScene extends Phaser.Scene {
   }
 
   private share() {
+    unlockAudio();
     const won = this.run.phase === 'won';
+    playSfx(won ? 'win' : 'lose');
     const title = won
       ? `${Copy.sharePrefix} ${this.run.score}${Copy.shareSuffix}`
       : shareFailText(this.run.score, this.run.nearMiss, Copy.shareFailDefault);

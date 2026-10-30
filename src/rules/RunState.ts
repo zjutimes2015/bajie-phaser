@@ -29,6 +29,7 @@ export interface RunState {
   nearMiss: string;
   phase: 'cover' | 'trash' | 'dialog' | 'boss' | 'won' | 'lost';
   bossHpRatio: number | null;
+  comboPeak: number;
 }
 
 const BEST_KEY = 'bajie_phaser_best';
@@ -71,6 +72,7 @@ export function freshRun(): RunState {
     nearMiss: '',
     phase: 'cover',
     bossHpRatio: null,
+    comboPeak: 0,
   };
 }
 

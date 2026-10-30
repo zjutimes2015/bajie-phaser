@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Copy, FONT } from '../rules/Copy';
 import { buffsFromChoice, type ChoiceId, type RunState } from '../rules/RunState';
 import { CRAVING_LOCK_SEC, addCraving, dialogCravingDelta } from '../rules/SheepV1';
+import { playSfx, unlockAudio } from '../audio/Sfx';
 
 interface DialogData {
   run: RunState;
@@ -30,6 +31,7 @@ export class DialogScene extends Phaser.Scene {
   }
 
   create() {
+    unlockAudio();
     const { width, height } = this.scale;
     this.cameras.main.setBackgroundColor('#1a1220');
 
@@ -83,7 +85,7 @@ export class DialogScene extends Phaser.Scene {
           color: '#b0a0c0',
         })
         .setOrigin(0.5);
-      r.on('pointerdown', () => this.pick(it.id));
+      r.on('pointerdown', () => { playSfx('ui'); this.pick(it.id); });
       this.choiceRoot.push(r, t, tip);
     });
   }
@@ -125,6 +127,9 @@ export class DialogScene extends Phaser.Scene {
 
     this.add.rectangle(width / 2, height * 0.58, 400, 24, 0x3a2848);
     this.qteBar = this.add.rectangle(width / 2 - 200, height * 0.58, 0, 24, 0x70d070).setOrigin(0, 0.5);
+    this.add.rectangle(width / 2, height * 0.62, 400, 10, 0x3a2848);
+    const timerFill = this.add.rectangle(width / 2 - 200, height * 0.62, 400, 10, 0xffd070).setOrigin(0, 0.5);
+    this.tweens.add({ targets: timerFill, width: 0, duration: QTE_SEC * 1000, ease: 'Linear' });
 
     const tap = this.add
       .rectangle(width / 2, height * 0.72, 280, 90, 0xc45c26)
@@ -151,19 +156,26 @@ export class DialogScene extends Phaser.Scene {
 
   private qteTap() {
     if (!this.qteOpen) return;
+    playSfx('hit');
     this.qteHits += 1;
     this.qteLabel.setText(`${this.qteHits} / ${QTE_NEED}`);
     this.qteBar.width = Math.min(400, (400 * this.qteHits) / QTE_NEED);
     if (this.qteHits >= QTE_NEED) {
       this.qteOpen = false;
-      this.finish('exorcise', true);
+      playSfx('perfect');
+      this.add.text(this.scale.width/2, this.scale.height*0.35, Copy.qteOk, { fontFamily: FONT, fontSize: '36px', color: '#80ffc0' }).setOrigin(0.5);
+      this.time.delayedCall(450, () => this.finish('exorcise', true));
+      return;
     }
   }
 
   private failQte() {
     if (!this.qteOpen) return;
     this.qteOpen = false;
-    this.finish('exorcise', false);
+    playSfx('hurt');
+    this.add.text(this.scale.width/2, this.scale.height*0.35, Copy.qteFail, { fontFamily: FONT, fontSize: '28px', color: '#ff8080' }).setOrigin(0.5);
+    this.cameras.main.shake(150, 0.01);
+    this.time.delayedCall(500, () => this.finish('exorcise', false));
   }
 
   private finish(choice: ChoiceId, bossBreak: boolean) {
