@@ -1,0 +1,21 @@
+{
+  "name": "bajie-phaser",
+  "version": "1.0.0",
+  "private": true,
+  "description": "八戒下山 — Phaser 3 HTML5 remake (A-tier playable prototype)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "node --experimental-strip-types tools/verify_sheep_v1.mjs",
+    "verify": "npm run test && npm run build"
+  },
+  "dependencies": {
+    "phaser": "^3.87.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7"
+  }
+}
